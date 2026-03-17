@@ -1,24 +1,17 @@
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-// Abstract Room Class
+// ================= DOMAIN MODEL =================
 abstract class Room {
-    private int numberOfBeds;
-    private double size;
+    private int beds;
     private double price;
 
-    public Room(int numberOfBeds, double size, double price) {
-        this.numberOfBeds = numberOfBeds;
-        this.size = size;
+    public Room(int beds, double price) {
+        this.beds = beds;
         this.price = price;
     }
 
-    public int getNumberOfBeds() {
-        return numberOfBeds;
-    }
-
-    public double getSize() {
-        return size;
+    public int getBeds() {
+        return beds;
     }
 
     public double getPrice() {
@@ -27,18 +20,16 @@ abstract class Room {
 
     public abstract String getRoomType();
 
-    public void displayDetails() {
-        System.out.println("Room Type: " + getRoomType());
-        System.out.println("Beds: " + numberOfBeds);
-        System.out.println("Size: " + size + " sq.ft");
+    public void display() {
+        System.out.println("Room: " + getRoomType());
+        System.out.println("Beds: " + beds);
         System.out.println("Price: ₹" + price);
     }
 }
 
-// Concrete Room Classes
 class SingleRoom extends Room {
     public SingleRoom() {
-        super(1, 200, 1500);
+        super(1, 1500);
     }
 
     public String getRoomType() {
@@ -48,7 +39,7 @@ class SingleRoom extends Room {
 
 class DoubleRoom extends Room {
     public DoubleRoom() {
-        super(2, 350, 2500);
+        super(2, 2500);
     }
 
     public String getRoomType() {
@@ -58,7 +49,7 @@ class DoubleRoom extends Room {
 
 class SuiteRoom extends Room {
     public SuiteRoom() {
-        super(3, 600, 5000);
+        super(3, 5000);
     }
 
     public String getRoomType() {
@@ -66,85 +57,63 @@ class SuiteRoom extends Room {
     }
 }
 
-// 🔥 Centralized Inventory Class
+// ================= INVENTORY =================
 class RoomInventory {
-    private Map<String, Integer> inventory;
+    private Map<String, Integer> data = new HashMap<>();
 
-    // Constructor initializes availability
     public RoomInventory() {
-        inventory = new HashMap<>();
+        data.put("Single Room", 5);
+        data.put("Double Room", 0); // unavailable
+        data.put("Suite Room", 2);
     }
 
-    // Add or initialize room type
-    public void addRoomType(String roomType, int count) {
-        inventory.put(roomType, count);
+    // READ ONLY METHOD
+    public int getAvailability(String type) {
+        return data.getOrDefault(type, 0);
     }
+}
 
-    // Get availability
-    public int getAvailability(String roomType) {
-        return inventory.getOrDefault(roomType, 0);
-    }
+// ================= SEARCH SERVICE =================
+class SearchService {
 
-    // Update availability (controlled)
-    public void updateAvailability(String roomType, int change) {
-        int current = inventory.getOrDefault(roomType, 0);
-        int updated = current + change;
+    // Read-only search
+    public void search(List<Room> rooms, RoomInventory inventory) {
 
-        if (updated < 0) {
-            System.out.println("Cannot reduce below 0 for " + roomType);
-        } else {
-            inventory.put(roomType, updated);
-        }
-    }
+        System.out.println("=== AVAILABLE ROOMS ===\n");
 
-    // Display full inventory
-    public void displayInventory() {
-        System.out.println("\n=== CURRENT ROOM INVENTORY ===");
-        for (Map.Entry<String, Integer> entry : inventory.entrySet()) {
-            System.out.println(entry.getKey() + " Available: " + entry.getValue());
+        for (Room r : rooms) {
+
+            int available = inventory.getAvailability(r.getRoomType());
+
+            // Validation (Defensive Programming)
+            if (available > 0) {
+                r.display();
+                System.out.println("Available: " + available);
+                System.out.println("----------------------");
+            }
         }
     }
 }
 
-// Main Application
+// ================= MAIN =================
 public class HotelApp {
     public static void main(String[] args) {
 
-        // Create Room Objects (Domain Model)
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        // Room objects (Domain)
+        List<Room> rooms = new ArrayList<>();
+        rooms.add(new SingleRoom());
+        rooms.add(new DoubleRoom());
+        rooms.add(new SuiteRoom());
 
-        // Initialize Inventory (Centralized)
+        // Inventory (State)
         RoomInventory inventory = new RoomInventory();
 
-        inventory.addRoomType(single.getRoomType(), 5);
-        inventory.addRoomType(doubleRoom.getRoomType(), 3);
-        inventory.addRoomType(suite.getRoomType(), 2);
+        // Search (Read-only)
+        SearchService service = new SearchService();
 
-        // Display Room Details
-        System.out.println("=== HOTEL ROOM DETAILS ===\n");
+        // Guest action
+        service.search(rooms, inventory);
 
-        single.displayDetails();
-        System.out.println("--------------------------");
-
-        doubleRoom.displayDetails();
-        System.out.println("--------------------------");
-
-        suite.displayDetails();
-        System.out.println("--------------------------");
-
-        // Display Inventory
-        inventory.displayInventory();
-
-        // Perform Updates
-        System.out.println("\nUpdating Inventory...");
-        inventory.updateAvailability("Single Room", -2); // booking
-        inventory.updateAvailability("Suite Room", +1);  // cancellation
-
-        // Display Updated Inventory
-        inventory.displayInventory();
-
-        System.out.println("\nApplication Terminated.");
+        System.out.println("\nSystem state unchanged.");
     }
 }
