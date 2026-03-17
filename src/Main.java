@@ -1,70 +1,102 @@
 import java.util.*;
 
+// ================= CUSTOM EXCEPTION =================
+class InvalidBookingException extends Exception {
+    public InvalidBookingException(String message) {
+        super(message);
+    }
+}
+
 // ================= RESERVATION =================
 class Reservation {
-    private String reservationId;
     private String guestName;
     private String roomType;
 
-    public Reservation(String reservationId, String guestName, String roomType) {
-        this.reservationId = reservationId;
+    public Reservation(String guestName, String roomType) {
         this.guestName = guestName;
         this.roomType = roomType;
     }
 
-    public String getReservationId() { return reservationId; }
     public String getGuestName() { return guestName; }
     public String getRoomType() { return roomType; }
+}
 
-    public void display() {
-        System.out.println(reservationId + " | " + guestName + " | " + roomType);
+// ================= INVENTORY =================
+class RoomInventory {
+    private Map<String, Integer> data = new HashMap<>();
+
+    public RoomInventory() {
+        data.put("Single Room", 2);
+        data.put("Double Room", 1);
+        data.put("Suite Room", 0);
+    }
+
+    public boolean isValidRoomType(String type) {
+        return data.containsKey(type);
+    }
+
+    public int getAvailability(String type) {
+        return data.getOrDefault(type, 0);
+    }
+
+    public void reduce(String type) throws InvalidBookingException {
+        int count = getAvailability(type);
+
+        if (count <= 0) {
+            throw new InvalidBookingException("No availability for " + type);
+        }
+
+        data.put(type, count - 1);
     }
 }
 
-// ================= BOOKING HISTORY =================
-class BookingHistory {
+// ================= VALIDATOR =================
+class BookingValidator {
 
-    // Ordered storage
-    private List<Reservation> history = new ArrayList<>();
+    public static void validate(Reservation r, RoomInventory inventory)
+            throws InvalidBookingException {
 
-    // Add confirmed booking
-    public void add(Reservation r) {
-        history.add(r);
-    }
+        // Check null/empty
+        if (r.getGuestName() == null || r.getGuestName().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty");
+        }
 
-    // Retrieve all bookings
-    public List<Reservation> getAll() {
-        return history;
+        // Validate room type
+        if (!inventory.isValidRoomType(r.getRoomType())) {
+            throw new InvalidBookingException("Invalid room type: " + r.getRoomType());
+        }
+
+        // Check availability
+        if (inventory.getAvailability(r.getRoomType()) <= 0) {
+            throw new InvalidBookingException("Room not available: " + r.getRoomType());
+        }
     }
 }
 
-// ================= REPORT SERVICE =================
-class BookingReportService {
+// ================= BOOKING SERVICE =================
+class BookingService {
 
-    // Display all bookings
-    public void showAllBookings(BookingHistory history) {
+    private RoomInventory inventory;
 
-        System.out.println("\n=== BOOKING HISTORY ===");
-
-        for (Reservation r : history.getAll()) {
-            r.display();
-        }
+    public BookingService(RoomInventory inventory) {
+        this.inventory = inventory;
     }
 
-    // Generate summary report
-    public void generateSummary(BookingHistory history) {
+    public void book(Reservation r) {
 
-        Map<String, Integer> countMap = new HashMap<>();
+        try {
+            // 🔥 Fail-Fast Validation
+            BookingValidator.validate(r, inventory);
 
-        for (Reservation r : history.getAll()) {
-            String type = r.getRoomType();
-            countMap.put(type, countMap.getOrDefault(type, 0) + 1);
-        }
+            // If valid → proceed
+            inventory.reduce(r.getRoomType());
 
-        System.out.println("\n=== BOOKING SUMMARY REPORT ===");
+            System.out.println("Booking SUCCESS for " + r.getGuestName()
+                    + " (" + r.getRoomType() + ")");
 
-        for (String type : countMap.keySet()) {
-            System.out.println(type + " → " + countMap.get(type) + " bookings");
+        } catch (InvalidBookingException e) {
+            // Graceful failure
+            System.out.println("Booking FAILED: " + e.getMessage());
         }
     }
 }
@@ -73,24 +105,17 @@ class BookingReportService {
 public class HotelApp {
     public static void main(String[] args) {
 
-        // Booking History (acts like in-memory persistence)
-        BookingHistory history = new BookingHistory();
+        RoomInventory inventory = new RoomInventory();
+        BookingService service = new BookingService(inventory);
 
-        // Simulating confirmed bookings
-        history.add(new Reservation("R101", "Alice", "Single Room"));
-        history.add(new Reservation("R102", "Bob", "Suite Room"));
-        history.add(new Reservation("R103", "Charlie", "Single Room"));
-        history.add(new Reservation("R104", "David", "Double Room"));
+        // Test cases (valid + invalid)
+        service.book(new Reservation("Alice", "Single Room"));   // ✅ success
+        service.book(new Reservation("", "Double Room"));        // ❌ empty name
+        service.book(new Reservation("Bob", "Luxury Room"));     // ❌ invalid type
+        service.book(new Reservation("Charlie", "Suite Room"));  // ❌ no availability
+        service.book(new Reservation("David", "Single Room"));   // ✅ success
+        service.book(new Reservation("Eve", "Single Room"));     // ❌ becomes unavailable
 
-        // Admin requests report
-        BookingReportService reportService = new BookingReportService();
-
-        // Show all bookings
-        reportService.showAllBookings(history);
-
-        // Generate summary
-        reportService.generateSummary(history);
-
-        System.out.println("\nHistory stored in order. Reporting is read-only.");
+        System.out.println("\nSystem continues running safely.");
     }
 }
